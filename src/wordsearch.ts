@@ -49,14 +49,6 @@ function randInt(n: number): number {
   return Math.floor(Math.random() * n);
 }
 
-function shuffle<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = randInt(i + 1);
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 /**
  * Pick `count` distinct words from the pool whose combined length fits the grid.
  * The longest word can be at most `maxLen` (so it fits in every orientation).
@@ -89,41 +81,76 @@ function emptyGrid(rows: number, cols: number): string[][] {
   return Array.from({ length: rows }, () => Array<string>(cols).fill(""));
 }
 
-/** Try to place a single word into the grid, returning its cells or null. */
+// Chance of forcing a crossing placement when one is available. High values
+// interlock the words, which makes the puzzle noticeably harder.
+const OVERLAP_BIAS = 0.85;
+
+interface Candidate {
+  cells: Cell[];
+  overlap: number;
+}
+
+/**
+ * Try to place a single word, preferring positions that cross words already on
+ * the board so the puzzle interlocks instead of laying words out in isolation.
+ */
 function placeWord(grid: string[][], word: string): Cell[] | null {
   const rows = grid.length;
   const cols = grid[0].length;
+  const candidates: Candidate[] = [];
 
-  const starts: Cell[] = [];
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) starts.push({ r, c });
-  shuffle(starts);
-  const dirs = shuffle([...DIRECTIONS]);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      for (const [dr, dc] of DIRECTIONS) {
+        const endR = r + dr * (word.length - 1);
+        const endC = c + dc * (word.length - 1);
+        if (endR < 0 || endR >= rows || endC < 0 || endC >= cols) continue;
 
-  for (const start of starts) {
-    for (const [dr, dc] of dirs) {
-      const endR = start.r + dr * (word.length - 1);
-      const endC = start.c + dc * (word.length - 1);
-      if (endR < 0 || endR >= rows || endC < 0 || endC >= cols) continue;
-
-      const cells: Cell[] = [];
-      let ok = true;
-      for (let i = 0; i < word.length; i++) {
-        const r = start.r + dr * i;
-        const c = start.c + dc * i;
-        const existing = grid[r][c];
-        if (existing !== "" && existing !== word[i]) {
-          ok = false;
-          break;
+        const cells: Cell[] = [];
+        let overlap = 0;
+        let ok = true;
+        for (let i = 0; i < word.length; i++) {
+          const cr = r + dr * i;
+          const cc = c + dc * i;
+          const existing = grid[cr][cc];
+          if (existing !== "") {
+            if (existing !== word[i]) {
+              ok = false;
+              break;
+            }
+            overlap++;
+          }
+          cells.push({ r: cr, c: cc });
         }
-        cells.push({ r, c });
+        if (ok) candidates.push({ cells, overlap });
       }
-      if (!ok) continue;
-
-      for (let i = 0; i < word.length; i++) grid[cells[i].r][cells[i].c] = word[i];
-      return cells;
     }
   }
-  return null;
+
+  if (candidates.length === 0) return null;
+
+  const crossing = candidates.filter((cand) => cand.overlap > 0);
+  let chosen: Candidate;
+  if (crossing.length > 0 && Math.random() < OVERLAP_BIAS) {
+    // Weight by overlap² so multi-letter crossings are strongly preferred.
+    const total = crossing.reduce((sum, cand) => sum + cand.overlap * cand.overlap, 0);
+    let pick = Math.random() * total;
+    chosen = crossing[crossing.length - 1];
+    for (const cand of crossing) {
+      pick -= cand.overlap * cand.overlap;
+      if (pick <= 0) {
+        chosen = cand;
+        break;
+      }
+    }
+  } else {
+    chosen = candidates[randInt(candidates.length)];
+  }
+
+  for (let i = 0; i < chosen.cells.length; i++) {
+    grid[chosen.cells[i].r][chosen.cells[i].c] = word[i];
+  }
+  return chosen.cells;
 }
 
 function emptyCells(grid: string[][]): Cell[] {
