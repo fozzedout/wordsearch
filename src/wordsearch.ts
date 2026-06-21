@@ -21,14 +21,14 @@ export interface Puzzle {
   placements: Placement[];
 }
 
-export const ROWS = 9;
+export const ROWS = 12;
 export const COLS = 6;
-export const WORD_COUNT = 10;
+export const WORD_COUNT = 15;
 
-// Keep total letters comfortably below the 54 cells so placement (with some
-// overlaps) reliably succeeds.
-const MAX_TOTAL_LETTERS = 40;
-const MIN_TOTAL_LETTERS = 30;
+// Total letters across all words. Higher = denser (fewer random-fill cells).
+// Placement relies on overlaps, so this can exceed a naive per-cell budget.
+const MAX_TOTAL_LETTERS = 68;
+const MIN_TOTAL_LETTERS = 58;
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
