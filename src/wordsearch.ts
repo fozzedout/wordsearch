@@ -21,8 +21,8 @@ export interface Puzzle {
   placements: Placement[];
 }
 
-export const ROWS = 6;
-export const COLS = 9;
+export const ROWS = 9;
+export const COLS = 6;
 export const WORD_COUNT = 10;
 
 // Keep total letters comfortably below the 54 cells so placement (with some

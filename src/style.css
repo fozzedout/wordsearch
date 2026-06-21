@@ -104,9 +104,10 @@ body {
 }
 
 .grid {
-  flex: 1 1 360px;
+  flex: 1 1 320px;
+  max-width: 440px;
   display: grid;
-  grid-template-columns: repeat(var(--cols, 9), 1fr);
+  grid-template-columns: repeat(var(--cols, 6), 1fr);
   gap: clamp(3px, 0.8vw, 6px);
   background: var(--surface);
   padding: clamp(8px, 1.5vw, 14px);
