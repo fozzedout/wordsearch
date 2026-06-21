@@ -105,14 +105,19 @@ body {
 
 .grid {
   position: relative;
-  flex: 1 1 320px;
-  max-width: 440px;
+  /* The grid is 6 wide x 12 tall, so its height is ~2x its width. Cap the
+     width by the available viewport height so the whole grid fits on a phone
+     screen — which keeps the squares small. */
+  flex: 0 1 auto;
+  width: min(100%, 360px); /* fallback for browsers without svh units */
+  width: min(100%, 360px, calc((100svh - 10rem) / 2.2));
+  container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(var(--cols, 6), 1fr);
-  gap: clamp(3px, 0.8vw, 6px);
+  gap: clamp(2px, 1cqw, 5px);
   background: var(--surface);
-  padding: clamp(8px, 1.5vw, 14px);
-  border-radius: 16px;
+  padding: clamp(5px, 1.6cqw, 12px);
+  border-radius: 14px;
   box-shadow: var(--shadow);
   touch-action: none;
   user-select: none;
@@ -126,8 +131,8 @@ body {
   justify-content: center;
   background: var(--cell-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: clamp(0.9rem, 2.6vw, 1.4rem);
+  border-radius: 6px;
+  font-size: clamp(0.5rem, 8.5cqw, 1.25rem);
   font-weight: 600;
   text-transform: uppercase;
   cursor: pointer;
@@ -169,8 +174,8 @@ body {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: 0.4rem 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: 0.35rem 0.75rem;
 }
 
 .word {
