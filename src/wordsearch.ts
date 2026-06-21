@@ -126,12 +126,55 @@ function placeWord(grid: string[][], word: string): Cell[] | null {
   return null;
 }
 
-function fillEmpty(grid: string[][]): void {
-  for (const row of grid) {
-    for (let c = 0; c < row.length; c++) {
-      if (row[c] === "") row[c] = ALPHABET[randInt(ALPHABET.length)];
+function emptyCells(grid: string[][]): Cell[] {
+  const cells: Cell[] = [];
+  for (let r = 0; r < grid.length; r++)
+    for (let c = 0; c < grid[r].length; c++) if (grid[r][c] === "") cells.push({ r, c });
+  return cells;
+}
+
+function fillCells(grid: string[][], cells: Cell[]): void {
+  for (const { r, c } of cells) grid[r][c] = ALPHABET[randInt(ALPHABET.length)];
+}
+
+// Canonical axes (one per line orientation) so each straight segment is counted
+// once regardless of which way it is read.
+const AXES: ReadonlyArray<readonly [number, number]> = [
+  [0, 1],
+  [1, 0],
+  [1, 1],
+  [1, -1],
+];
+
+/** How many distinct straight segments spell `word` (forwards or backwards). */
+function countSegments(grid: string[][], word: string): number {
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const reversed = [...word].reverse().join("");
+  const len = word.length;
+  let count = 0;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      for (const [dr, dc] of AXES) {
+        const endR = r + dr * (len - 1);
+        const endC = c + dc * (len - 1);
+        if (endR < 0 || endR >= rows || endC < 0 || endC >= cols) continue;
+        let s = "";
+        for (let i = 0; i < len; i++) s += grid[r + dr * i][c + dc * i];
+        if (s === word || s === reversed) count++;
+      }
     }
   }
+  return count;
+}
+
+/**
+ * True when every word can be found in exactly one place — so the player never
+ * sees a second, valid-looking position that the game would reject.
+ */
+function isUnambiguous(grid: string[][], words: string[]): boolean {
+  return words.every((w) => countSegments(grid, w) === 1);
 }
 
 /** Generate a complete puzzle, retrying word selection/placement until it fits. */
@@ -158,9 +201,17 @@ export function generatePuzzle(pool: string[]): Puzzle {
       placements.push({ word, cells });
     }
 
-    if (success) {
-      fillEmpty(grid);
-      return { rows: ROWS, cols: COLS, grid, placements };
+    if (!success) continue;
+
+    // Fill the blanks, retrying until no word appears a second time. If random
+    // fills can't make it unambiguous (e.g. the placed words themselves spell a
+    // duplicate), fall through and try a fresh placement.
+    const blanks = emptyCells(grid);
+    for (let fillTry = 0; fillTry < 40; fillTry++) {
+      fillCells(grid, blanks);
+      if (isUnambiguous(grid, words)) {
+        return { rows: ROWS, cols: COLS, grid, placements };
+      }
     }
   }
 
