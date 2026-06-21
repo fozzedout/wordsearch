@@ -16,12 +16,25 @@ const confettiCanvas = document.getElementById("confetti") as HTMLCanvasElement;
 
 let puzzle: Puzzle;
 let cellEls: HTMLDivElement[][] = [];
+let linesEl: SVGElement | null = null;
 const found = new Set<string>();
+
+// Persistent lines drawn through each found word.
+interface Segment {
+  a: Cell;
+  b: Cell;
+  color: string;
+}
+let foundSegments: Segment[] = [];
 
 // Active drag selection.
 let selecting = false;
 let startCell: Cell | null = null;
 let previewPath: Cell[] = [];
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const PREVIEW_COLOR = "rgba(245, 158, 11, 0.5)";
+const segmentColor = (i: number) => `hsla(${(i * 47) % 360}, 85%, 55%, 0.5)`;
 
 // --- Word pool ------------------------------------------------------------
 
@@ -53,6 +66,11 @@ function renderGrid(): void {
     }
     cellEls.push(row);
   }
+
+  // Overlay for the selection / found-word lines (drawn on top of the cells).
+  linesEl = document.createElementNS(SVG_NS, "svg");
+  linesEl.setAttribute("class", "grid-lines");
+  gridEl.appendChild(linesEl);
 }
 
 function renderWordList(): void {
@@ -94,15 +112,52 @@ function pathBetween(start: Cell, end: Cell): Cell[] | null {
   return cells;
 }
 
+/** Centre of a cell in pixels, relative to the grid's top-left corner. */
+function cellCenter(cell: Cell): { x: number; y: number } {
+  const grid = gridEl.getBoundingClientRect();
+  const rect = cellEls[cell.r][cell.c].getBoundingClientRect();
+  return { x: rect.left - grid.left + rect.width / 2, y: rect.top - grid.top + rect.height / 2 };
+}
+
+function drawLine(a: Cell, b: Cell, color: string, width: number): void {
+  if (!linesEl) return;
+  const p1 = cellCenter(a);
+  const p2 = cellCenter(b);
+  const line = document.createElementNS(SVG_NS, "line");
+  line.setAttribute("x1", String(p1.x));
+  line.setAttribute("y1", String(p1.y));
+  line.setAttribute("x2", String(p2.x));
+  line.setAttribute("y2", String(p2.y));
+  line.setAttribute("stroke", color);
+  line.setAttribute("stroke-width", String(width));
+  line.setAttribute("stroke-linecap", "round");
+  linesEl.appendChild(line);
+}
+
+/** Redraw all found-word lines plus the live selection line. */
+function drawLines(): void {
+  if (!linesEl) return;
+  const grid = gridEl.getBoundingClientRect();
+  linesEl.setAttribute("viewBox", `0 0 ${grid.width} ${grid.height}`);
+  while (linesEl.firstChild) linesEl.removeChild(linesEl.firstChild);
+
+  const cell = cellEls[0]?.[0]?.getBoundingClientRect();
+  const width = (cell?.width ?? 24) * 0.72;
+
+  for (const seg of foundSegments) drawLine(seg.a, seg.b, seg.color, width);
+  if (previewPath.length > 0) {
+    drawLine(previewPath[0], previewPath[previewPath.length - 1], PREVIEW_COLOR, width);
+  }
+}
+
 function clearPreview(): void {
-  for (const { r, c } of previewPath) cellEls[r][c]?.classList.remove("selecting");
   previewPath = [];
+  drawLines();
 }
 
 function showPreview(path: Cell[]): void {
-  clearPreview();
   previewPath = path;
-  for (const { r, c } of path) cellEls[r][c]?.classList.add("selecting");
+  drawLines();
 }
 
 function samePath(a: Cell[], b: Cell[]): boolean {
@@ -123,6 +178,12 @@ function matchPlacement(path: Cell[]): Placement | null {
 function markFound(placement: Placement): void {
   found.add(placement.word);
   for (const { r, c } of placement.cells) cellEls[r][c].classList.add("found");
+  foundSegments.push({
+    a: placement.cells[0],
+    b: placement.cells[placement.cells.length - 1],
+    color: segmentColor(foundSegments.length),
+  });
+  drawLines();
   wordListEl.querySelector(`[data-word="${placement.word}"]`)?.classList.add("found");
   renderProgress();
 
@@ -174,6 +235,7 @@ function onPointerUp(): void {
 
 function newGame(pool: string[]): void {
   found.clear();
+  foundSegments = [];
   winBanner.classList.add("hidden");
   puzzle = generatePuzzle(pool);
   renderGrid();
@@ -194,6 +256,9 @@ async function main(): Promise<void> {
   gridEl.addEventListener("pointerdown", onPointerDown);
   newGameBtn.addEventListener("click", () => newGame(pool));
   playAgainBtn.addEventListener("click", () => newGame(pool));
+
+  // Keep the lines aligned with the grid as it reflows / resizes.
+  new ResizeObserver(() => drawLines()).observe(gridEl);
 
   newGame(pool);
 }

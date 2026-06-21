@@ -104,6 +104,7 @@ body {
 }
 
 .grid {
+  position: relative;
   flex: 1 1 320px;
   max-width: 440px;
   display: grid;
@@ -133,20 +134,21 @@ body {
   transition: background 0.1s ease, color 0.1s ease, transform 0.1s ease;
 }
 
-.cell.selecting {
-  background: var(--select);
-  color: var(--select-text);
-  transform: scale(1.04);
-}
-
+/* Found words are marked by the line overlay; keep the letters lightly
+   emphasised so they stay distinct underneath the translucent line. */
 .cell.found {
-  background: var(--found-bg);
-  color: var(--found);
-  border-color: var(--found);
+  font-weight: 800;
 }
 
-.cell.found.selecting {
-  transform: none;
+/* Overlay holding the selection and found-word lines. */
+.grid-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  overflow: visible;
 }
 
 .panel {
