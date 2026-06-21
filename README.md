@@ -10,6 +10,14 @@ letters; found words are crossed off the list. Clear the board to trigger a
 confetti celebration. The UI automatically follows your system **light/dark**
 theme.
 
+It is an installable **PWA**: a web app manifest plus a service worker
+pre-cache the app shell and word list so it runs offline and can be added to
+the home screen. iOS specifics follow
+[this guidance](https://gist.github.com/fozzedout/5e77925381991a9570151550992baf14) —
+`viewport-fit=cover`, `apple-mobile-web-app` meta tags, safe-area insets around
+the notch / Dynamic Island / home indicator, and `vh`-based sizing (avoiding
+`100%`/`dvh`). The service worker is only registered in production builds.
+
 ## Word list
 
 Words come from [`fozzedout/jaxah`](https://github.com/fozzedout/jaxah)

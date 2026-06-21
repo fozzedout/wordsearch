@@ -43,10 +43,12 @@
 html,
 body {
   margin: 0;
-  height: 100%;
 }
 
 body {
+  /* Per the iOS PWA guidance: use vh (not 100% or dvh) so viewport-fit:cover
+     and the safe-area insets behave on iPhone, including PWA cold start. */
+  min-height: 100vh;
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -56,11 +58,15 @@ body {
 #app {
   max-width: 920px;
   margin: 0 auto;
-  padding: clamp(1rem, 3vw, 2rem);
+  /* Respect the notch / Dynamic Island / home indicator. */
+  padding: max(clamp(1rem, 3vw, 2rem), env(safe-area-inset-top))
+    max(clamp(1rem, 3vw, 2rem), env(safe-area-inset-right))
+    max(clamp(1rem, 3vw, 2rem), env(safe-area-inset-bottom))
+    max(clamp(1rem, 3vw, 2rem), env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  min-height: 100%;
+  min-height: 100vh;
 }
 
 .app-header {
@@ -113,7 +119,14 @@ body {
      available viewport height so the whole grid fits the screen for any
      number of columns/rows. */
   width: min(100%, 540px); /* fallback for browsers without svh units */
-  width: min(100%, 540px, calc((100svh - 10rem) * var(--cols) / var(--rows)));
+  width: min(
+    100%,
+    540px,
+    calc(
+      (100svh - 10rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) *
+        var(--cols) / var(--rows)
+    )
+  );
   container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(var(--cols, 6), 1fr);
