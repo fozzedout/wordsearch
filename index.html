@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#6366f1" />
+    <meta name="description" content="A word search puzzle game — find 10 hidden words in the grid." />
+    <title>Word Search</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <h1>Word Search</h1>
+        <button id="new-game" class="btn" type="button">New Game</button>
+      </header>
+
+      <main class="game">
+        <div id="grid" class="grid" aria-label="Word search grid"></div>
+        <aside class="panel">
+          <h2>Find these words</h2>
+          <ul id="word-list" class="word-list"></ul>
+          <p id="progress" class="progress"></p>
+        </aside>
+      </main>
+    </div>
+
+    <canvas id="confetti" class="confetti-canvas" aria-hidden="true"></canvas>
+
+    <div id="win-banner" class="win-banner hidden" role="status">
+      <div class="win-card">
+        <h2>🎉 You found them all!</h2>
+        <button id="play-again" class="btn" type="button">Play Again</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
