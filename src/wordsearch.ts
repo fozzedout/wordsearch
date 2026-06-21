@@ -22,13 +22,13 @@ export interface Puzzle {
 }
 
 export const ROWS = 12;
-export const COLS = 6;
-export const WORD_COUNT = 15;
+export const COLS = 9;
+export const WORD_COUNT = 20;
 
 // Total letters across all words. Higher = denser (fewer random-fill cells).
 // Placement relies on overlaps, so this can exceed a naive per-cell budget.
-const MAX_TOTAL_LETTERS = 68;
-const MIN_TOTAL_LETTERS = 58;
+const MAX_TOTAL_LETTERS = 92;
+const MIN_TOTAL_LETTERS = 80;
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 

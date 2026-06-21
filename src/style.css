@@ -109,12 +109,15 @@ body {
      width by the available viewport height so the whole grid fits on a phone
      screen — which keeps the squares small. */
   flex: 0 1 auto;
-  width: min(100%, 360px); /* fallback for browsers without svh units */
-  width: min(100%, 360px, calc((100svh - 10rem) / 2.2));
+  /* Square cells, so grid height = width * rows / cols. Cap the width by the
+     available viewport height so the whole grid fits the screen for any
+     number of columns/rows. */
+  width: min(100%, 540px); /* fallback for browsers without svh units */
+  width: min(100%, 540px, calc((100svh - 10rem) * var(--cols) / var(--rows)));
   container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(var(--cols, 6), 1fr);
-  gap: clamp(2px, 1cqw, 5px);
+  gap: clamp(1px, 0.8cqw, 4px);
   background: var(--surface);
   padding: clamp(5px, 1.6cqw, 12px);
   border-radius: 14px;
@@ -131,8 +134,9 @@ body {
   justify-content: center;
   background: var(--cell-bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: clamp(0.5rem, 8.5cqw, 1.25rem);
+  border-radius: 5px;
+  /* Scale the letter with the cell: each cell is ~100cqw/cols wide. */
+  font-size: clamp(0.45rem, calc(52cqw / var(--cols, 6)), 1.1rem);
   font-weight: 600;
   text-transform: uppercase;
   cursor: pointer;
