@@ -102,18 +102,14 @@ body {
   transform: scale(0.97);
 }
 
-.game {
+.board {
   display: flex;
-  flex-wrap: wrap;
-  gap: clamp(1rem, 3vw, 2rem);
+  justify-content: center;
   align-items: flex-start;
 }
 
 .grid {
   position: relative;
-  /* The grid is 6 wide x 12 tall, so its height is ~2x its width. Cap the
-     width by the available viewport height so the whole grid fits on a phone
-     screen — which keeps the squares small. */
   flex: 0 1 auto;
   /* Square cells, so grid height = width * rows / cols. Cap the width by the
      available viewport height so the whole grid fits the screen for any
@@ -174,7 +170,6 @@ body {
 }
 
 .panel {
-  flex: 1 1 220px;
   background: var(--surface);
   border-radius: 16px;
   padding: 1.25rem 1.5rem;
@@ -215,6 +210,54 @@ body {
   margin: 1.25rem 0 0;
   color: var(--muted);
   font-weight: 600;
+}
+
+/* Landscape: put the title, word list and New Game on the left, and let the
+   word search grid fill the available height on the right. */
+@media (orientation: landscape) {
+  #app {
+    display: grid;
+    grid-template-columns: clamp(180px, 26vw, 300px) 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "header board"
+      "panel  board";
+    align-items: stretch;
+    max-width: none;
+    height: 100vh;
+  }
+
+  .app-header {
+    grid-area: header;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .panel {
+    grid-area: panel;
+    overflow: auto;
+    min-height: 0;
+  }
+
+  .board {
+    grid-area: board;
+    align-items: center;
+    min-height: 0;
+    height: 100%;
+  }
+
+  /* Fill the column height; cell squares set the matching width. The 4rem
+     covers the app's top+bottom padding so the grid never overflows. */
+  .grid {
+    width: min(
+      100%,
+      calc(
+        (100svh - 4rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) *
+          var(--cols) / var(--rows)
+      )
+    );
+  }
 }
 
 .confetti-canvas {

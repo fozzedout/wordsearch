@@ -24,6 +24,7 @@ interface Segment {
   a: Cell;
   b: Cell;
   color: string;
+  word: string;
 }
 let foundSegments: Segment[] = [];
 
@@ -35,6 +36,7 @@ let previewPath: Cell[] = [];
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PREVIEW_COLOR = "rgba(245, 158, 11, 0.5)";
 const segmentColor = (i: number) => `hsla(${(i * 47) % 360}, 85%, 55%, 0.5)`;
+const STORAGE_KEY = "wordsearch:state:v1";
 
 // --- Word pool ------------------------------------------------------------
 
@@ -182,10 +184,12 @@ function markFound(placement: Placement): void {
     a: placement.cells[0],
     b: placement.cells[placement.cells.length - 1],
     color: segmentColor(foundSegments.length),
+    word: placement.word,
   });
   drawLines();
   wordListEl.querySelector(`[data-word="${placement.word}"]`)?.classList.add("found");
   renderProgress();
+  saveState();
 
   if (found.size === puzzle.placements.length) {
     setTimeout(showWin, 250);
@@ -231,16 +235,74 @@ function onPointerUp(): void {
   if (match) markFound(match);
 }
 
+// --- Persistence ----------------------------------------------------------
+
+interface SavedState {
+  puzzle: Puzzle;
+  found: string[];
+}
+
+function saveState(): void {
+  try {
+    const state: SavedState = { puzzle, found: foundSegments.map((s) => s.word) };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Storage may be unavailable (private mode, quota) — ignore.
+  }
+}
+
+function loadState(): SavedState | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as SavedState;
+    if (!s?.puzzle?.grid?.length || !Array.isArray(s.puzzle.placements) || !Array.isArray(s.found)) {
+      return null;
+    }
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+/** Rebuild the found set and the coloured line segments from a list of words. */
+function rebuildFound(words: string[]): void {
+  found.clear();
+  foundSegments = [];
+  for (const word of words) {
+    const placement = puzzle.placements.find((p) => p.word === word);
+    if (!placement) continue;
+    found.add(word);
+    foundSegments.push({
+      a: placement.cells[0],
+      b: placement.cells[placement.cells.length - 1],
+      color: segmentColor(foundSegments.length),
+      word,
+    });
+  }
+}
+
 // --- Game lifecycle -------------------------------------------------------
+
+/** Render the whole puzzle from current state (grid, list, found marks, lines). */
+function render(): void {
+  renderGrid();
+  renderWordList();
+  renderProgress();
+  for (const word of found) {
+    const placement = puzzle.placements.find((p) => p.word === word);
+    placement?.cells.forEach(({ r, c }) => cellEls[r][c].classList.add("found"));
+  }
+  drawLines();
+}
 
 function newGame(pool: string[]): void {
   found.clear();
   foundSegments = [];
   winBanner.classList.add("hidden");
   puzzle = generatePuzzle(pool);
-  renderGrid();
-  renderWordList();
-  renderProgress();
+  render();
+  saveState();
 }
 
 async function main(): Promise<void> {
@@ -260,7 +322,15 @@ async function main(): Promise<void> {
   // Keep the lines aligned with the grid as it reflows / resizes.
   new ResizeObserver(() => drawLines()).observe(gridEl);
 
-  newGame(pool);
+  // Restore the previous session if there is one, otherwise start fresh.
+  const saved = loadState();
+  if (saved) {
+    puzzle = saved.puzzle;
+    rebuildFound(saved.found);
+    render();
+  } else {
+    newGame(pool);
+  }
 }
 
 main();
