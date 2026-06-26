@@ -91,6 +91,27 @@ interface Candidate {
 }
 
 /**
+ * How many cells are already filled in each row and column. A straight word
+ * only fits where its whole length stays on the board, so border cells lie on
+ * far fewer candidate lines than central ones. Left to a uniform pick, that
+ * geometry leaves the outer rows and columns conspicuously bare. These counts
+ * let free (non-crossing) placements steer toward the emptier lines instead.
+ */
+function lineFill(grid: string[][]): { rowFill: number[]; colFill: number[] } {
+  const rowFill = new Array<number>(grid.length).fill(0);
+  const colFill = new Array<number>(grid[0].length).fill(0);
+  for (let r = 0; r < grid.length; r++) {
+    for (let c = 0; c < grid[r].length; c++) {
+      if (grid[r][c] !== "") {
+        rowFill[r]++;
+        colFill[c]++;
+      }
+    }
+  }
+  return { rowFill, colFill };
+}
+
+/**
  * Try to place a single word, preferring positions that cross words already on
  * the board so the puzzle interlocks instead of laying words out in isolation.
  */
@@ -144,7 +165,32 @@ function placeWord(grid: string[][], word: string): Cell[] | null {
       }
     }
   } else {
-    chosen = candidates[randInt(candidates.length)];
+    // No crossing was forced, so weight the free placement by how empty the
+    // rows and columns it would occupy currently are. This counteracts the
+    // border sparseness (top/bottom rows and outer columns) without touching
+    // the interlocking crossings above, so puzzle difficulty is unchanged.
+    const { rowFill, colFill } = lineFill(grid);
+    const weights = candidates.map((cand) => {
+      let need = 0;
+      for (const { r, c } of cand.cells) {
+        if (grid[r][c] === "") need += 1 / (1 + rowFill[r]) + 1 / (1 + colFill[c]);
+      }
+      return need * need; // sharpen so the emptiest lines win clearly
+    });
+    const total = weights.reduce((sum, w) => sum + w, 0);
+    if (total <= 0) {
+      chosen = candidates[randInt(candidates.length)];
+    } else {
+      let pick = Math.random() * total;
+      chosen = candidates[candidates.length - 1];
+      for (let i = 0; i < candidates.length; i++) {
+        pick -= weights[i];
+        if (pick <= 0) {
+          chosen = candidates[i];
+          break;
+        }
+      }
+    }
   }
 
   for (let i = 0; i < chosen.cells.length; i++) {
