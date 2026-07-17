@@ -37,6 +37,9 @@
       <aside class="panel">
         <h2>Find these words</h2>
         <ul id="word-list" class="word-list"></ul>
+        <div class="progress-track" aria-hidden="true">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
         <p id="progress" class="progress"></p>
       </aside>
     </div>
@@ -46,6 +49,7 @@
     <div id="win-banner" class="win-banner hidden" role="status">
       <div class="win-card">
         <h2>🎉 You found them all!</h2>
+        <p id="win-stats" class="win-stats"></p>
         <button id="play-again" class="btn" type="button">Play Again</button>
       </div>
     </div>

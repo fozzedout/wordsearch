@@ -27,6 +27,7 @@ const GRAVITY = 0.18;
 const DRAG = 0.995;
 
 export function launchConfetti(canvas: HTMLCanvasElement, durationMs = 2800): void {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
@@ -43,17 +44,19 @@ export function launchConfetti(canvas: HTMLCanvasElement, durationMs = 2800): vo
   const particles: Particle[] = [];
   const count = 220;
 
-  // Two bursts from the lower corners, fountaining upward and out.
+  // Two bursts from the lower corners, fountaining upward and inward so the
+  // confetti arcs across the screen instead of exiting at the nearest edge.
   for (let i = 0; i < count; i++) {
     const fromLeft = i % 2 === 0;
     const originX = fromLeft ? w * 0.1 : w * 0.9;
-    const angle = (fromLeft ? -1 : 1) * (Math.PI / 4 + Math.random() * (Math.PI / 4));
-    const speed = 9 + Math.random() * 9;
+    // Tilt 10°–55° from vertical, toward the centre of the screen.
+    const tilt = Math.PI / 18 + Math.random() * (Math.PI / 4);
+    const speed = 10 + Math.random() * 9;
     particles.push({
       x: originX,
       y: window.innerHeight + 10,
-      vx: Math.sin(angle) * speed,
-      vy: -Math.cos(angle) * speed - 6,
+      vx: Math.sin(tilt) * speed * (fromLeft ? 1 : -1),
+      vy: -Math.cos(tilt) * speed - 6,
       size: 6 + Math.random() * 6,
       color: COLORS[Math.floor(Math.random() * COLORS.length)],
       rotation: Math.random() * Math.PI * 2,

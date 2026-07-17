@@ -7,6 +7,8 @@ import { launchConfetti } from "./confetti";
 const gridEl = document.getElementById("grid") as HTMLDivElement;
 const wordListEl = document.getElementById("word-list") as HTMLUListElement;
 const progressEl = document.getElementById("progress") as HTMLParagraphElement;
+const progressFillEl = document.getElementById("progress-fill") as HTMLDivElement;
+const winStatsEl = document.getElementById("win-stats") as HTMLParagraphElement;
 const newGameBtn = document.getElementById("new-game") as HTMLButtonElement;
 const playAgainBtn = document.getElementById("play-again") as HTMLButtonElement;
 const winBanner = document.getElementById("win-banner") as HTMLDivElement;
@@ -35,8 +37,15 @@ let previewPath: Cell[] = [];
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PREVIEW_COLOR = "rgba(245, 158, 11, 0.5)";
-const segmentColor = (i: number) => `hsla(${(i * 47) % 360}, 85%, 55%, 0.5)`;
+const MISS_COLOR = "rgba(239, 68, 68, 0.45)";
+const segmentHue = (i: number) => (i * 47) % 360;
+const segmentColor = (i: number) => `hsla(${segmentHue(i)}, 85%, 55%, 0.5)`;
+// Opaque sibling of segmentColor, used for the word-list strike-through.
+const wordColor = (i: number) => `hsl(${segmentHue(i)}, 75%, 50%)`;
 const STORAGE_KEY = "wordsearch:state:v1";
+
+const prefersReducedMotion = (): boolean =>
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // --- Word pool ------------------------------------------------------------
 
@@ -63,6 +72,18 @@ function renderGrid(): void {
       cell.textContent = puzzle.grid[r][c];
       cell.dataset.r = String(r);
       cell.dataset.c = String(c);
+      // Deal the letters in with a diagonal cascade. The class is removed when
+      // the animation ends so it can't replay when other classes toggle.
+      cell.classList.add("deal");
+      cell.style.animationDelay = `${(r + c) * 16}ms`;
+      cell.addEventListener(
+        "animationend",
+        () => {
+          cell.classList.remove("deal");
+          cell.style.animationDelay = "";
+        },
+        { once: true },
+      );
       gridEl.appendChild(cell);
       row.push(cell);
     }
@@ -82,13 +103,21 @@ function renderWordList(): void {
     li.className = "word";
     li.dataset.word = word;
     li.textContent = word;
-    if (found.has(word)) li.classList.add("found");
+    if (found.has(word)) {
+      li.classList.add("found");
+      // Match the strike-through to the word's line colour in the grid.
+      const idx = foundSegments.findIndex((s) => s.word === word);
+      if (idx >= 0) li.style.textDecorationColor = wordColor(idx);
+    }
     wordListEl.appendChild(li);
   }
 }
 
 function renderProgress(): void {
   progressEl.textContent = `${found.size} / ${puzzle.placements.length} found`;
+  const pct = (found.size / puzzle.placements.length) * 100;
+  progressFillEl.style.width = `${pct}%`;
+  progressFillEl.classList.toggle("complete", found.size === puzzle.placements.length);
 }
 
 // --- Selection helpers ----------------------------------------------------
@@ -121,8 +150,8 @@ function cellCenter(cell: Cell): { x: number; y: number } {
   return { x: rect.left - grid.left + rect.width / 2, y: rect.top - grid.top + rect.height / 2 };
 }
 
-function drawLine(a: Cell, b: Cell, color: string, width: number): void {
-  if (!linesEl) return;
+function drawLine(a: Cell, b: Cell, color: string, width: number): SVGLineElement | null {
+  if (!linesEl) return null;
   const p1 = cellCenter(a);
   const p2 = cellCenter(b);
   const line = document.createElementNS(SVG_NS, "line");
@@ -134,10 +163,31 @@ function drawLine(a: Cell, b: Cell, color: string, width: number): void {
   line.setAttribute("stroke-width", String(width));
   line.setAttribute("stroke-linecap", "round");
   linesEl.appendChild(line);
+  return line;
 }
 
-/** Redraw all found-word lines plus the live selection line. */
-function drawLines(): void {
+/** Sweep a line in from its start point using a dash-offset transition. */
+function sweepIn(line: SVGLineElement, a: Cell, b: Cell, width: number): void {
+  if (prefersReducedMotion()) return;
+  const p1 = cellCenter(a);
+  const p2 = cellCenter(b);
+  // Full length including the round caps, so nothing is clipped at offset 0.
+  const len = Math.hypot(p2.x - p1.x, p2.y - p1.y) + width;
+  line.style.strokeDasharray = String(len);
+  line.style.strokeDashoffset = String(len);
+  line.style.transition = "stroke-dashoffset 0.35s ease-out";
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      line.style.strokeDashoffset = "0";
+    });
+  });
+}
+
+/**
+ * Redraw all found-word lines plus the live selection line. With
+ * `animateLast`, the most recent found line sweeps in from its first letter.
+ */
+function drawLines(animateLast = false): void {
   if (!linesEl) return;
   const grid = gridEl.getBoundingClientRect();
   linesEl.setAttribute("viewBox", `0 0 ${grid.width} ${grid.height}`);
@@ -146,9 +196,33 @@ function drawLines(): void {
   const cell = cellEls[0]?.[0]?.getBoundingClientRect();
   const width = (cell?.width ?? 24) * 0.72;
 
-  for (const seg of foundSegments) drawLine(seg.a, seg.b, seg.color, width);
+  foundSegments.forEach((seg, i) => {
+    const line = drawLine(seg.a, seg.b, seg.color, width);
+    if (line && animateLast && i === foundSegments.length - 1) {
+      sweepIn(line, seg.a, seg.b, width);
+    }
+  });
   if (previewPath.length > 0) {
     drawLine(previewPath[0], previewPath[previewPath.length - 1], PREVIEW_COLOR, width);
+  }
+}
+
+/** Flash a fading red line over an attempted-but-wrong selection. */
+function flashMiss(path: Cell[]): void {
+  const cell = cellEls[0]?.[0]?.getBoundingClientRect();
+  const width = (cell?.width ?? 24) * 0.72;
+  const line = drawLine(path[0], path[path.length - 1], MISS_COLOR, width);
+  if (!line) return;
+  line.classList.add("miss");
+  // Removal is timed rather than tied to animationend so the line still goes
+  // away under prefers-reduced-motion (where the fade animation is disabled).
+  setTimeout(() => line.remove(), 500);
+
+  // Timed removal: animationend also bubbles up from cell animations, which
+  // would end the shake early.
+  if (!prefersReducedMotion() && !gridEl.classList.contains("shake")) {
+    gridEl.classList.add("shake");
+    setTimeout(() => gridEl.classList.remove("shake"), 350);
   }
 }
 
@@ -179,15 +253,38 @@ function matchPlacement(path: Cell[]): Placement | null {
 
 function markFound(placement: Placement): void {
   found.add(placement.word);
-  for (const { r, c } of placement.cells) cellEls[r][c].classList.add("found");
+  const index = foundSegments.length;
+
+  // Pop each letter in sequence along the word, following the line sweep.
+  const reduced = prefersReducedMotion();
+  placement.cells.forEach(({ r, c }, i) => {
+    const el = cellEls[r][c];
+    el.classList.add("found");
+    if (reduced) return;
+    el.style.animationDelay = `${i * 45}ms`;
+    el.classList.add("pop");
+    el.addEventListener(
+      "animationend",
+      () => {
+        el.classList.remove("pop");
+        el.style.animationDelay = "";
+      },
+      { once: true },
+    );
+  });
+
   foundSegments.push({
     a: placement.cells[0],
     b: placement.cells[placement.cells.length - 1],
-    color: segmentColor(foundSegments.length),
+    color: segmentColor(index),
     word: placement.word,
   });
-  drawLines();
-  wordListEl.querySelector(`[data-word="${placement.word}"]`)?.classList.add("found");
+  drawLines(true);
+  const li = wordListEl.querySelector<HTMLElement>(`[data-word="${placement.word}"]`);
+  if (li) {
+    li.classList.add("found");
+    li.style.textDecorationColor = wordColor(index);
+  }
   renderProgress();
   saveState();
 
@@ -197,6 +294,7 @@ function markFound(placement: Placement): void {
 }
 
 function showWin(): void {
+  winStatsEl.textContent = `All ${puzzle.placements.length} words found`;
   winBanner.classList.remove("hidden");
   launchConfetti(confettiCanvas);
 }
@@ -225,14 +323,26 @@ function onPointerMove(e: PointerEvent): void {
 
 function onPointerUp(): void {
   if (!selecting) return;
-  const match = matchPlacement(previewPath);
+  const attempt = previewPath;
+  const match = matchPlacement(attempt);
   clearPreview();
   selecting = false;
   startCell = null;
   window.removeEventListener("pointermove", onPointerMove);
   window.removeEventListener("pointerup", onPointerUp);
   window.removeEventListener("pointercancel", onPointerUp);
-  if (match) markFound(match);
+  if (match) {
+    markFound(match);
+    return;
+  }
+  // Flash a real (multi-cell) attempt red — unless it retraces a word that
+  // was already found, which isn't a mistake.
+  const alreadyFound = puzzle.placements.some(
+    (p) =>
+      found.has(p.word) &&
+      (samePath(attempt, p.cells) || samePath(attempt, [...p.cells].reverse())),
+  );
+  if (attempt.length >= 2 && !alreadyFound) flashMiss(attempt);
 }
 
 // --- Persistence ----------------------------------------------------------

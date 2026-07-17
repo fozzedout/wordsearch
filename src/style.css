@@ -7,12 +7,14 @@
   --cell-bg: #ffffff;
   --cell-hover: #eef0ff;
   --accent: #6366f1;
+  --accent-2: #a855f7;
   --accent-text: #ffffff;
   --select: #fde68a;
   --select-text: #1f2233;
   --found: #10b981;
   --found-bg: #d1fae5;
   --shadow: 0 6px 24px rgba(20, 20, 50, 0.08);
+  --bg-glow: rgba(99, 102, 241, 0.1);
 
   color-scheme: light dark;
 }
@@ -27,12 +29,14 @@
     --cell-bg: #232838;
     --cell-hover: #2d3346;
     --accent: #818cf8;
+    --accent-2: #c084fc;
     --accent-text: #11131c;
     --select: #b45309;
     --select-text: #fff7ed;
     --found: #34d399;
     --found-bg: #064e3b;
     --shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    --bg-glow: rgba(129, 140, 248, 0.12);
   }
 }
 
@@ -49,7 +53,8 @@ body {
   /* Per the iOS PWA guidance: use vh (not 100% or dvh) so viewport-fit:cover
      and the safe-area insets behave on iPhone, including PWA cold start. */
   min-height: 100vh;
-  background: var(--bg);
+  /* Faint accent glow bleeding down from the top of the page. */
+  background: radial-gradient(120% 60% at 50% 0%, var(--bg-glow), transparent 60%), var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -81,11 +86,15 @@ body {
   margin: 0;
   font-size: clamp(1.5rem, 4vw, 2.25rem);
   letter-spacing: -0.02em;
+  background: linear-gradient(120deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .btn {
   border: none;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: var(--accent-text);
   font: inherit;
   font-weight: 600;
@@ -159,6 +168,76 @@ body {
   font-weight: 800;
 }
 
+/* New-game deal-in: letters cascade diagonally (delay set per cell in JS).
+   The class is removed on animationend so later class toggles can't replay it. */
+@keyframes cell-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.cell.deal {
+  animation: cell-in 0.3s ease both;
+}
+
+/* Staggered pop along a just-found word (delay set per cell in JS). */
+@keyframes cell-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.cell.pop {
+  animation: cell-pop 0.32s ease both;
+  z-index: 1;
+}
+
+/* Wrong-guess feedback: quick sideways shake of the whole board. */
+@keyframes grid-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+
+.grid.shake {
+  animation: grid-shake 0.3s ease;
+}
+
+/* ...and the attempted line fades out red (removed by a timer in JS). */
+@keyframes miss-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.grid-lines line.miss {
+  animation: miss-fade 0.45s ease forwards;
+}
+
 /* Overlay holding the selection and found-word lines. */
 .grid-lines {
   position: absolute;
@@ -207,10 +286,41 @@ body {
   opacity: 0.65;
 }
 
+.progress-track {
+  margin-top: 1.25rem;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width 0.4s ease;
+}
+
+@keyframes progress-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.35);
+  }
+}
+
+.progress-fill.complete {
+  animation: progress-pulse 1.2s ease infinite;
+}
+
 .progress {
-  margin: 1.25rem 0 0;
+  margin: 0.5rem 0 0;
   color: var(--muted);
   font-weight: 600;
+  font-size: 0.9rem;
 }
 
 /* Landscape: put the title, word list and New Game on the left, and let the
@@ -267,13 +377,15 @@ body {
   }
 }
 
+/* Above the win banner (z-index 60) so the confetti isn't dimmed by the
+   banner's backdrop; pointer-events stay off so Play Again is clickable. */
 .confetti-canvas {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
   pointer-events: none;
-  z-index: 50;
+  z-index: 70;
 }
 
 .hidden {
@@ -287,6 +399,8 @@ body {
   align-items: center;
   justify-content: center;
   background: rgba(10, 10, 25, 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   z-index: 60;
   padding: 1rem;
 }
@@ -302,8 +416,14 @@ body {
 }
 
 .win-card h2 {
-  margin: 0 0 1.25rem;
-  font-size: 1.5rem;
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.5rem, 5vw, 2rem);
+}
+
+.win-stats {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 @keyframes pop {
@@ -314,5 +434,25 @@ body {
   to {
     transform: scale(1);
     opacity: 1;
+  }
+}
+
+/* Respect reduced-motion: no cascades, pops, shakes or pulses. (The line
+   sweep and confetti are skipped in JS; the miss line is removed by timer.) */
+@media (prefers-reduced-motion: reduce) {
+  .cell.deal,
+  .cell.pop,
+  .grid.shake,
+  .grid-lines line.miss,
+  .progress-fill.complete,
+  .win-card {
+    animation: none;
+  }
+
+  .progress-fill,
+  .cell,
+  .btn,
+  .word {
+    transition: none;
   }
 }
