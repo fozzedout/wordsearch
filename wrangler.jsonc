@@ -8,6 +8,11 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
+  // Cloudflare Workers Builds runs `npx wrangler deploy` directly. On a fresh
+  // clone there is no build output yet, so build the client/worker here first.
+  // (When deploying after a local `npm run build`, the Vite plugin's redirect
+  // config is used instead and this command is skipped — so no double build.)
+  "build": { "command": "npm install && npm run build" },
   "observability": {
     "enabled": true
   }
